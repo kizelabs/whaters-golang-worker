@@ -1,6 +1,7 @@
 services:
   wa1:
     image: whatsapp-go:latest
+    pull_policy: never
     restart: unless-stopped
     ports:
       - "127.0.0.1:${WA1_HOST_PORT:-18081}:8080"
@@ -26,6 +27,7 @@ services:
 
   wa2:
     image: whatsapp-go:latest
+    pull_policy: never
     restart: unless-stopped
     ports:
       - "127.0.0.1:${WA2_HOST_PORT:-18082}:8080"

@@ -1,5 +1,6 @@
 services:
   wa1:
+    image: whatsapp-go:latest
     build:
       context: .
     restart: unless-stopped
@@ -26,8 +27,7 @@ services:
       - "${WA1_DATA_DIR:-./data/wa1}:/data"
 
   wa2:
-    build:
-      context: .
+    image: whatsapp-go:latest
     restart: unless-stopped
     ports:
       - "127.0.0.1:${WA2_HOST_PORT:-18082}:8080"

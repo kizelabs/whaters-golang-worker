@@ -1,8 +1,6 @@
 services:
   wa1:
     image: whatsapp-go:latest
-    build:
-      context: .
     restart: unless-stopped
     ports:
       - "127.0.0.1:${WA1_HOST_PORT:-18081}:8080"

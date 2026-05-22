@@ -1,0 +1,52 @@
+services:
+  wa1:
+    build:
+      context: .
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${WA1_HOST_PORT:-18081}:8080"
+    environment:
+      ADDR: "${ADDR:-:8080}"
+      DATA_DIR: "${DATA_DIR:-/data}"
+      WORKER_WEBHOOK_URL: "${WORKER_WEBHOOK_URL:-}"
+      SERVICE_TOKEN: "${SERVICE_TOKEN:-}"
+      WHATSAPP_DEVICE_OS_NAME: "${WHATSAPP_DEVICE_OS_NAME:-KizeLabs WhatERS}"
+      SESSION_STORE_DRIVER: "${SESSION_STORE_DRIVER:-postgres}"
+      DATABASE_URL: "${DATABASE_URL:-}"
+      DATABASE_SCHEMA: "${DATABASE_SCHEMA:-public}"
+      INSTANCE_ID: "${WA1_INSTANCE_ID:-wa-vps-1}"
+      LEASE_TTL_SECONDS: "${LEASE_TTL_SECONDS:-30}"
+      LEASE_HEARTBEAT_SECONDS: "${LEASE_HEARTBEAT_SECONDS:-10}"
+      LEASE_STALE_GRACE_SECONDS: "${LEASE_STALE_GRACE_SECONDS:-5}"
+    cpus: "${WHATSAPP_CPUS:-1.0}"
+    mem_limit: "${WHATSAPP_MEM_LIMIT:-512m}"
+    memswap_limit: "${WHATSAPP_MEMSWAP_LIMIT:-768m}"
+    pids_limit: "${WHATSAPP_PIDS_LIMIT:-256}"
+    volumes:
+      - "${WA1_DATA_DIR:-./data/wa1}:/data"
+
+  wa2:
+    build:
+      context: .
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${WA2_HOST_PORT:-18082}:8080"
+    environment:
+      ADDR: "${ADDR:-:8080}"
+      DATA_DIR: "${DATA_DIR:-/data}"
+      WORKER_WEBHOOK_URL: "${WORKER_WEBHOOK_URL:-}"
+      SERVICE_TOKEN: "${SERVICE_TOKEN:-}"
+      WHATSAPP_DEVICE_OS_NAME: "${WHATSAPP_DEVICE_OS_NAME:-KizeLabs WhatERS}"
+      SESSION_STORE_DRIVER: "${SESSION_STORE_DRIVER:-postgres}"
+      DATABASE_URL: "${DATABASE_URL:-}"
+      DATABASE_SCHEMA: "${DATABASE_SCHEMA:-public}"
+      INSTANCE_ID: "${WA2_INSTANCE_ID:-wa-vps-2}"
+      LEASE_TTL_SECONDS: "${LEASE_TTL_SECONDS:-30}"
+      LEASE_HEARTBEAT_SECONDS: "${LEASE_HEARTBEAT_SECONDS:-10}"
+      LEASE_STALE_GRACE_SECONDS: "${LEASE_STALE_GRACE_SECONDS:-5}"
+    cpus: "${WHATSAPP_CPUS:-1.0}"
+    mem_limit: "${WHATSAPP_MEM_LIMIT:-512m}"
+    memswap_limit: "${WHATSAPP_MEMSWAP_LIMIT:-768m}"
+    pids_limit: "${WHATSAPP_PIDS_LIMIT:-256}"
+    volumes:
+      - "${WA2_DATA_DIR:-./data/wa2}:/data"

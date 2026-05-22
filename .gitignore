@@ -1,0 +1,10 @@
+.env
+.env.*
+!.env.example
+data/
+
+# Go build/test artifacts
+whatsapp-service
+*.test
+*.out
+coverage.out

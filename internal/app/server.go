@@ -13,6 +13,7 @@ import (
 	"mime"
 	"net/http"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -98,7 +99,7 @@ func New(cfg config.Config, logger *slog.Logger) (*Server, error) {
 		}
 		srv.lease = leaseCoordinator
 
-		store, err := initPostgresStore(context.Background(), cfg.DatabaseURL)
+		store, err := initPostgresStore(context.Background(), cfg.DatabaseURL, cfg.DatabaseSchema)
 		if err != nil {
 			return nil, err
 		}
@@ -107,7 +108,7 @@ func New(cfg config.Config, logger *slog.Logger) (*Server, error) {
 	return srv, nil
 }
 
-func initPostgresStore(ctx context.Context, databaseURL string) (*sqlstore.Container, error) {
+func initPostgresStore(ctx context.Context, databaseURL, databaseSchema string) (*sqlstore.Container, error) {
 	db, err := sql.Open("postgres", databaseURL)
 	if err != nil {
 		return nil, err
@@ -130,6 +131,18 @@ func initPostgresStore(ctx context.Context, databaseURL string) (*sqlstore.Conta
 	defer func() {
 		_, _ = db.ExecContext(context.Background(), "SELECT pg_advisory_unlock($1)", lockKey)
 	}()
+
+	if databaseSchema != "" {
+		if !regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*$`).MatchString(databaseSchema) {
+			_ = db.Close()
+			return nil, fmt.Errorf("invalid DATABASE_SCHEMA identifier")
+		}
+		// Ensure whatsmeow sqlstore migrations/tables resolve to the configured schema.
+		if _, err := db.ExecContext(lockCtx, fmt.Sprintf("SET search_path TO %s, public", databaseSchema)); err != nil {
+			_ = db.Close()
+			return nil, fmt.Errorf("failed to set search_path: %w", err)
+		}
+	}
 
 	store := sqlstore.NewWithDB(db, "postgres", waLog.Stdout("Database", "INFO", true))
 	if err := store.Upgrade(lockCtx); err != nil {

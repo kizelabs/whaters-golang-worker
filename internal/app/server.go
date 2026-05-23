@@ -18,6 +18,13 @@ import (
 	"sync"
 	"time"
 
+	"wago-worker/whatsapp-service/internal/config"
+	"wago-worker/whatsapp-service/internal/httpapi"
+	"wago-worker/whatsapp-service/internal/lease"
+	sessionpkg "wago-worker/whatsapp-service/internal/session"
+	"wago-worker/whatsapp-service/internal/webhook"
+
+	"github.com/lib/pq"
 	"go.mau.fi/whatsmeow"
 	"go.mau.fi/whatsmeow/proto/waE2E"
 	waStore "go.mau.fi/whatsmeow/store"
@@ -26,14 +33,10 @@ import (
 	"go.mau.fi/whatsmeow/types/events"
 	waLog "go.mau.fi/whatsmeow/util/log"
 	"google.golang.org/protobuf/proto"
-	"wago-worker/whatsapp-service/internal/config"
-	"wago-worker/whatsapp-service/internal/httpapi"
-	"wago-worker/whatsapp-service/internal/lease"
-	sessionpkg "wago-worker/whatsapp-service/internal/session"
-	"wago-worker/whatsapp-service/internal/webhook"
 )
 
 var errNotOwner = errors.New("session is owned by another instance")
+var schemaIdentPattern = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*$`)
 
 type Server struct {
 	cfg      config.Config
@@ -133,12 +136,12 @@ func initPostgresStore(ctx context.Context, databaseURL, databaseSchema string) 
 	}()
 
 	if databaseSchema != "" {
-		if !regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*$`).MatchString(databaseSchema) {
+		if !schemaIdentPattern.MatchString(databaseSchema) {
 			_ = db.Close()
 			return nil, fmt.Errorf("invalid DATABASE_SCHEMA identifier")
 		}
 		// Ensure whatsmeow sqlstore migrations/tables resolve to the configured schema.
-		if _, err := db.ExecContext(lockCtx, fmt.Sprintf("SET search_path TO %s, public", databaseSchema)); err != nil {
+		if _, err := db.ExecContext(lockCtx, fmt.Sprintf("SET search_path TO %s, public", pq.QuoteIdentifier(databaseSchema))); err != nil {
 			_ = db.Close()
 			return nil, fmt.Errorf("failed to set search_path: %w", err)
 		}

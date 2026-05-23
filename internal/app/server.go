@@ -18,6 +18,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/lib/pq"
 	"go.mau.fi/whatsmeow"
 	"go.mau.fi/whatsmeow/proto/waE2E"
 	waStore "go.mau.fi/whatsmeow/store"
@@ -34,6 +35,7 @@ import (
 )
 
 var errNotOwner = errors.New("session is owned by another instance")
+var schemaIdentPattern = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*$`)
 
 type Server struct {
 	cfg      config.Config
@@ -81,6 +83,7 @@ type inboundMessage struct {
 	From      string       `json:"from"`
 	Chat      string       `json:"chat"`
 	Timestamp string       `json:"timestamp"`
+	ProfilePictureURL string `json:"profilePictureUrl,omitempty"`
 	Text      string       `json:"text,omitempty"`
 	Media     *mediaObject `json:"media,omitempty"`
 }
@@ -133,12 +136,12 @@ func initPostgresStore(ctx context.Context, databaseURL, databaseSchema string) 
 	}()
 
 	if databaseSchema != "" {
-		if !regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*$`).MatchString(databaseSchema) {
+		if !schemaIdentPattern.MatchString(databaseSchema) {
 			_ = db.Close()
 			return nil, fmt.Errorf("invalid DATABASE_SCHEMA identifier")
 		}
 		// Ensure whatsmeow sqlstore migrations/tables resolve to the configured schema.
-		if _, err := db.ExecContext(lockCtx, fmt.Sprintf("SET search_path TO %s, public", databaseSchema)); err != nil {
+		if _, err := db.ExecContext(lockCtx, fmt.Sprintf("SET search_path TO %s, public", pq.QuoteIdentifier(databaseSchema))); err != nil {
 			_ = db.Close()
 			return nil, fmt.Errorf("failed to set search_path: %w", err)
 		}
@@ -454,6 +457,9 @@ func (s *Server) forwardInbound(ctx context.Context, session *waSession, evt *ev
 		Chat:      stripServer(evt.Info.Chat.String()),
 		Timestamp: evt.Info.Timestamp.UTC().Format(time.RFC3339),
 		Text:      messageText(evt.Message),
+	}
+	if pic, err := session.client.GetProfilePictureInfo(ctx, evt.Info.Sender, nil); err == nil && pic != nil {
+		payload.ProfilePictureURL = pic.URL
 	}
 	if media := mediaFromMessage(evt.Message); media != nil {
 		data, err := session.client.Download(ctx, media.downloadable)

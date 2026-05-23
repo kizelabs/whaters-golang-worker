@@ -18,12 +18,6 @@ import (
 	"sync"
 	"time"
 
-	"wago-worker/whatsapp-service/internal/config"
-	"wago-worker/whatsapp-service/internal/httpapi"
-	"wago-worker/whatsapp-service/internal/lease"
-	sessionpkg "wago-worker/whatsapp-service/internal/session"
-	"wago-worker/whatsapp-service/internal/webhook"
-
 	"github.com/lib/pq"
 	"go.mau.fi/whatsmeow"
 	"go.mau.fi/whatsmeow/proto/waE2E"
@@ -33,6 +27,11 @@ import (
 	"go.mau.fi/whatsmeow/types/events"
 	waLog "go.mau.fi/whatsmeow/util/log"
 	"google.golang.org/protobuf/proto"
+	"wago-worker/whatsapp-service/internal/config"
+	"wago-worker/whatsapp-service/internal/httpapi"
+	"wago-worker/whatsapp-service/internal/lease"
+	sessionpkg "wago-worker/whatsapp-service/internal/session"
+	"wago-worker/whatsapp-service/internal/webhook"
 )
 
 var errNotOwner = errors.New("session is owned by another instance")
@@ -84,6 +83,7 @@ type inboundMessage struct {
 	From      string       `json:"from"`
 	Chat      string       `json:"chat"`
 	Timestamp string       `json:"timestamp"`
+	ProfilePictureURL string `json:"profilePictureUrl,omitempty"`
 	Text      string       `json:"text,omitempty"`
 	Media     *mediaObject `json:"media,omitempty"`
 }
@@ -457,6 +457,9 @@ func (s *Server) forwardInbound(ctx context.Context, session *waSession, evt *ev
 		Chat:      stripServer(evt.Info.Chat.String()),
 		Timestamp: evt.Info.Timestamp.UTC().Format(time.RFC3339),
 		Text:      messageText(evt.Message),
+	}
+	if pic, err := session.client.GetProfilePictureInfo(ctx, evt.Info.Sender, nil); err == nil && pic != nil {
+		payload.ProfilePictureURL = pic.URL
 	}
 	if media := mediaFromMessage(evt.Message); media != nil {
 		data, err := session.client.Download(ctx, media.downloadable)

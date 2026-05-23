@@ -97,13 +97,49 @@ func New(cfg config.Config, logger *slog.Logger) (*Server, error) {
 			return nil, err
 		}
 		srv.lease = leaseCoordinator
-		store, err := sqlstore.New(context.Background(), "postgres", cfg.DatabaseURL, waLog.Stdout("Database", "INFO", true))
+
+		store, err := initPostgresStore(context.Background(), cfg.DatabaseURL)
 		if err != nil {
 			return nil, err
 		}
 		srv.store = store
 	}
 	return srv, nil
+}
+
+func initPostgresStore(ctx context.Context, databaseURL string) (*sqlstore.Container, error) {
+	db, err := sql.Open("postgres", databaseURL)
+	if err != nil {
+		return nil, err
+	}
+	db.SetMaxOpenConns(1)
+	db.SetMaxIdleConns(1)
+	if err := db.PingContext(ctx); err != nil {
+		_ = db.Close()
+		return nil, err
+	}
+
+	const lockKey int64 = 740031231991
+	lockCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
+	defer cancel()
+
+	if _, err := db.ExecContext(lockCtx, "SELECT pg_advisory_lock($1)", lockKey); err != nil {
+		_ = db.Close()
+		return nil, fmt.Errorf("failed to acquire startup advisory lock: %w", err)
+	}
+	defer func() {
+		_, _ = db.ExecContext(context.Background(), "SELECT pg_advisory_unlock($1)", lockKey)
+	}()
+
+	store := sqlstore.NewWithDB(db, "postgres", waLog.Stdout("Database", "INFO", true))
+	if err := store.Upgrade(lockCtx); err != nil {
+		_ = db.Close()
+		return nil, fmt.Errorf("failed to upgrade database: %w", err)
+	}
+
+	db.SetMaxOpenConns(10)
+	db.SetMaxIdleConns(5)
+	return store, nil
 }
 
 func (s *Server) Handler() http.Handler {

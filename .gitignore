@@ -2,6 +2,9 @@
 .env.*
 !.env.example
 data/
+!cmd/
+!cmd/whatsapp-service/
+!cmd/whatsapp-service/main.go
 
 # Go build/test artifacts
 whatsapp-service
